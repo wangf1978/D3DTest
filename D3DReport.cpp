@@ -31,7 +31,7 @@ std::ostream& operator<< (std::ostream &os, GUID& guid)
 		<< std::setw(2) << std::setfill('0') << (int)guid.Data4[7];
 }
 
-std::tuple<DXGI_RATIONAL/* frame-rate */, UINT /* width */, UINT /* height */> video_fmts[] =
+static const std::tuple<DXGI_RATIONAL/* frame-rate */, UINT /* width */, UINT /* height */> video_fmts[] =
 {
 	{ { 30000, 1001 }, 720, 480 },
 	{ { 60000, 1001 }, 720, 480 },
@@ -56,7 +56,7 @@ std::tuple<DXGI_RATIONAL/* frame-rate */, UINT /* width */, UINT /* height */> v
 	{ { 60, 1 }, 3840, 2160 }
 };
 
-std::tuple<UINT, const char*> device_cap_names[] = {
+static const std::tuple<UINT, const char*> device_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_DEVICE_CAPS_LINEAR_SPACE, "Linear_Space" },
 	{ D3D11_VIDEO_PROCESSOR_DEVICE_CAPS_xvYCC, "xvYCC" },
 	{ D3D11_VIDEO_PROCESSOR_DEVICE_CAPS_RGB_RANGE_CONVERSION, "RGB_RANGE_CONVERSION" },
@@ -64,7 +64,7 @@ std::tuple<UINT, const char*> device_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_DEVICE_CAPS_NOMINAL_RANGE, "Nominal_Range" }
 };
 
-std::tuple<UINT, const char*> feature_cap_names[] = {
+static const std::tuple<UINT, const char*> feature_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_ALPHA_FILL, "Alpha Fill" },
 	{ D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_CONSTRICTION, "Constriction" },
 	{ D3D11_VIDEO_PROCESSOR_FEATURE_CAPS_LUMA_KEY, "LumaKey" },
@@ -80,7 +80,7 @@ std::tuple<UINT, const char*> feature_cap_names[] = {
 };
 
 
-std::tuple<UINT, const char*> filter_cap_names[] = {
+static const std::tuple<UINT, const char*> filter_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_FILTER_CAPS_BRIGHTNESS, "Brightness" },
 	{ D3D11_VIDEO_PROCESSOR_FILTER_CAPS_CONTRAST, "Contrast" },
 	{ D3D11_VIDEO_PROCESSOR_FILTER_CAPS_HUE, "Hue" },
@@ -91,14 +91,14 @@ std::tuple<UINT, const char*> filter_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_FILTER_CAPS_STEREO_ADJUSTMENT, "Stereo Adjustment" }
 };
 
-std::tuple<UINT, const char*> inputformat_cap_names[] = {
+static const std::tuple<UINT, const char*> inputformat_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_FORMAT_CAPS_RGB_INTERLACED, "RGB Interlaced" },
 	{ D3D11_VIDEO_PROCESSOR_FORMAT_CAPS_RGB_PROCAMP, "RGB ProcAmp" },
 	{ D3D11_VIDEO_PROCESSOR_FORMAT_CAPS_RGB_LUMA_KEY, "RGB Luma Key" },
 	{ D3D11_VIDEO_PROCESSOR_FORMAT_CAPS_PALETTE_INTERLACED, "Palette Interlaced" },
 };
 
-std::tuple<UINT, const char*> autostream_cap_names[] = {
+static const std::tuple<UINT, const char*> autostream_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_AUTO_STREAM_CAPS_DENOISE, "De-Noise" },
 	{ D3D11_VIDEO_PROCESSOR_AUTO_STREAM_CAPS_DERINGING, "Deringing" },
 	{ D3D11_VIDEO_PROCESSOR_AUTO_STREAM_CAPS_EDGE_ENHANCEMENT, "Edge Enhancement" },
@@ -109,12 +109,34 @@ std::tuple<UINT, const char*> autostream_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_AUTO_STREAM_CAPS_ANAMORPHIC_SCALING, "Anamorphic Scaling" }
 };
 
-std::tuple<UINT, const char*> stereo_cap_names[] = {
+static const std::tuple<UINT, const char*> stereo_cap_names[] = {
 	{ D3D11_VIDEO_PROCESSOR_STEREO_CAPS_MONO_OFFSET, "Mono Offset" },
 	{ D3D11_VIDEO_PROCESSOR_STEREO_CAPS_ROW_INTERLEAVED, "Row Interleaved" },
 	{ D3D11_VIDEO_PROCESSOR_STEREO_CAPS_COLUMN_INTERLEAVED, "Column Interleaved" },
 	{ D3D11_VIDEO_PROCESSOR_STEREO_CAPS_CHECKERBOARD, "CheckerBoard" },
 	{ D3D11_VIDEO_PROCESSOR_STEREO_CAPS_FLIP_MODE, "Flip Mode" }
+};
+
+static const std::tuple<UINT, const char*> D3D11_VIDEO_PROCESSOR_PROCESSOR_CAP_names[] = {
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_BLEND),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_BOB),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_ADAPTIVE),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_MOTION_COMPENSATION),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_INVERSE_TELECINE),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_FRAME_RATE_CONVERSION),
+};
+
+static const std::tuple<UINT, const char*> D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_names[] = {
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_32),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_22),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_2224),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_2332),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_32322),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_55),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_64),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_87),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_222222222223),
+	DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_OTHER),
 };
 
 
@@ -1084,7 +1106,7 @@ HRESULT CD3DReport::GenerateVideoDeviceReport(ID3D11VideoDevice* pVideoDevice, T
 
 						prev_vp_caps = vp_caps;
 
-						std::tuple<UINT, const char*, std::tuple<UINT, const char*>*, UINT> v_vpcaps[] = {
+						std::tuple<UINT, const char*, const std::tuple<UINT, const char*>*, UINT> v_vpcaps[] = {
 							{ vp_caps.DeviceCaps, "DeviceCaps", device_cap_names, (UINT)_countof(device_cap_names) },
 							{ vp_caps.FeatureCaps, "FeatureCaps", feature_cap_names, (UINT)_countof(feature_cap_names) },
 							{ vp_caps.FilterCaps, "FilterCaps", filter_cap_names, (UINT)_countof(filter_cap_names) },
@@ -1128,28 +1150,6 @@ HRESULT CD3DReport::GenerateVideoDeviceReport(ID3D11VideoDevice* pVideoDevice, T
 						{
 							if (FAILED(spVPEnum->GetVideoProcessorRateConversionCaps(idxRateConv, &rateconv_caps)))
 								continue;
-
-							static const std::tuple<UINT, const char*> D3D11_VIDEO_PROCESSOR_PROCESSOR_CAP_names[] = {
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_BLEND),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_BOB),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_ADAPTIVE),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_DEINTERLACE_MOTION_COMPENSATION),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_INVERSE_TELECINE),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_PROCESSOR_CAPS_FRAME_RATE_CONVERSION),
-							};
-
-							static const std::tuple<UINT, const char*> D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_names[] = {
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_32),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_22),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_2224),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_2332),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_32322),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_55),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_64),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_87),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_222222222223),
-								DECL_TUPLE(D3D11_VIDEO_PROCESSOR_ITELECINE_CAPS_OTHER),
-							};
 
 							std::ostringstream oss;
 
