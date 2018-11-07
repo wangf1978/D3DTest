@@ -12,7 +12,8 @@
 #include <sstream>
 #include <stdio.h>
 
-#define DECL_TUPLE(x)	{x, #x}
+#define DECL_TUPLE(x)		{x, #x}
+#define DECL_TUPLE_T(x)		{x, _T(#x)}
 
 template<typename T>
 inline std::string GetBitsString(const std::tuple<T, const char*>* bit_names, size_t bits_count, T bits_value)
