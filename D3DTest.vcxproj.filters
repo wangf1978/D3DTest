@@ -45,6 +45,12 @@
     <ClInclude Include="D3DTypeNames.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="OPMSession.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CryptUtil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -66,6 +72,12 @@
       <Filter>Source Files\tinyxml</Filter>
     </ClCompile>
     <ClCompile Include="D3DReport.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="OPMSession.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CryptUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

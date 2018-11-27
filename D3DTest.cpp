@@ -1,4 +1,4 @@
-// D3DTest.cpp : Defines the entry point for the console application.
+﻿// D3DTest.cpp : Defines the entry point for the console application.
 //
 
 #include "stdafx.h"
@@ -7,6 +7,15 @@
 #include "D3DReport.h"
 #include <wrl/client.h>
 #include <tuple>
+#include <d3d9.h>
+#include <initguid.h>
+#include <opmapi.h>
+#include <wmcodecdsp.h>
+#include "OPMSession.h"
+
+#define AES_KEYSIZE		(16)
+
+int g_verbose_level = 0;
 
 using namespace Microsoft::WRL;
 
@@ -82,38 +91,21 @@ void PrintBuf(TCHAR* buf, int buf_size, int nLeadingSpace)
 	_tprintf(_T("\n"));
 }
 
-using FLAG_NAME_PAIR = const std::tuple<UINT, const TCHAR*>;
-
 static FLAG_NAME_PAIR Device_state_flag_names[] = {
-	DECL_TUPLE_T(DISPLAY_DEVICE_ATTACHED_TO_DESKTOP),
-	DECL_TUPLE_T(DISPLAY_DEVICE_MULTI_DRIVER),
-	DECL_TUPLE_T(DISPLAY_DEVICE_PRIMARY_DEVICE),
-	DECL_TUPLE_T(DISPLAY_DEVICE_MIRRORING_DRIVER),
-	DECL_TUPLE_T(DISPLAY_DEVICE_VGA_COMPATIBLE),
-	DECL_TUPLE_T(DISPLAY_DEVICE_REMOVABLE),
-	DECL_TUPLE_T(DISPLAY_DEVICE_ACC_DRIVER),
-	DECL_TUPLE_T(DISPLAY_DEVICE_RDPUDD),
-	DECL_TUPLE_T(DISPLAY_DEVICE_DISCONNECT),
-	DECL_TUPLE_T(DISPLAY_DEVICE_REMOTE),
-	DECL_TUPLE_T(DISPLAY_DEVICE_MODESPRUNED),
-	DECL_TUPLE_T(DISPLAY_DEVICE_TS_COMPATIBLE),
-	DECL_TUPLE_T(DISPLAY_DEVICE_UNSAFE_MODES_ON),
+	DECL_TUPLE(DISPLAY_DEVICE_ATTACHED_TO_DESKTOP),
+	DECL_TUPLE(DISPLAY_DEVICE_MULTI_DRIVER),
+	DECL_TUPLE(DISPLAY_DEVICE_PRIMARY_DEVICE),
+	DECL_TUPLE(DISPLAY_DEVICE_MIRRORING_DRIVER),
+	DECL_TUPLE(DISPLAY_DEVICE_VGA_COMPATIBLE),
+	DECL_TUPLE(DISPLAY_DEVICE_REMOVABLE),
+	DECL_TUPLE(DISPLAY_DEVICE_ACC_DRIVER),
+	DECL_TUPLE(DISPLAY_DEVICE_RDPUDD),
+	DECL_TUPLE(DISPLAY_DEVICE_DISCONNECT),
+	DECL_TUPLE(DISPLAY_DEVICE_REMOTE),
+	DECL_TUPLE(DISPLAY_DEVICE_MODESPRUNED),
+	DECL_TUPLE(DISPLAY_DEVICE_TS_COMPATIBLE),
+	DECL_TUPLE(DISPLAY_DEVICE_UNSAFE_MODES_ON),
 };
-
-void GetFlagsDesc(UINT nFlags, FLAG_NAME_PAIR* flag_names, size_t flag_count, TCHAR* szDesc, int ccDesc)
-{
-	bool bFirst = true;
-	int ccWritten = 0;
-	memset(szDesc, 0, ccDesc);
-	for (size_t i = 0; i < flag_count; i++)
-	{
-		if (nFlags&(std::get<0>(flag_names[i])))
-		{
-			ccWritten += _stprintf_s(szDesc + ccWritten, ccDesc - ccWritten, _T("%s%s"), !bFirst ? _T(" | ") : _T(""), std::get<1>(flag_names[i]));
-			bFirst = false;
-		}
-	}
-}
 
 int ListDisplayDevices()
 {
@@ -166,6 +158,415 @@ int ListDisplayDevices()
 	return 0;
 }
 
+void CopyAndAdvancePtr(BYTE*& pDest, const BYTE* pSrc, DWORD cb)
+{
+	memcpy(pDest, pSrc, cb);
+	pDest += cb;
+}
+
+void ShowOPMVideoOutputStatus(IOPMVideoOutput* pOPMVideoOutput, int nIndent= 0)
+{
+	HRESULT hr = S_OK;
+	if (pOPMVideoOutput == nullptr)
+		return;
+
+	WCHAR szIndent[1024];
+	memset(szIndent, 0, sizeof(szIndent));
+	for (size_t i = 0; i < nIndent; i++)
+		szIndent[i] = L' ';
+
+	ULONG ulStatusFlag = 0;
+	COPMSession OPMSession(pOPMVideoOutput, &hr);
+
+	if (FAILED(hr))
+	{
+		wprintf(L"Failed to initialize a OPM session {hr: 0X%08X(%s)}.\n", hr, OPM_RESULT_NAME(hr));
+		return;
+	}
+
+	ULONG ConnectorType = 0;
+	hr = OPMSession.GetConnectorType(ConnectorType, &ulStatusFlag);
+	
+	if (SUCCEEDED(hr))
+	{
+		if (ConnectorType&OPM_COPP_COMPATIBLE_CONNECTOR_TYPE_INTERNAL)
+		{
+			wprintf(L"%sConnector Type: Internal connector\n", szIndent);
+			wprintf(L"%s                (*)The connection between the graphics adapter and the display device is permanent and not accessible to the user\n", szIndent);
+		}
+
+		switch (ConnectorType&OPM_BUS_IMPLEMENTATION_MODIFIER_MASK)
+		{
+		case OPM_CONNECTOR_TYPE_VGA:
+			wprintf(L"%sConnector Type: Video Graphics Array (VGA) connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_SVIDEO:
+			wprintf(L"%sConnector Type: S-Video connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_COMPOSITE_VIDEO:
+			wprintf(L"%sConnector Type: Composite video connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_COMPONENT_VIDEO:
+			wprintf(L"%sConnector Type: Component video connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_DVI:
+			wprintf(L"%sConnector Type: Digital video interface (DVI) connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_HDMI:
+			wprintf(L"%sConnector Type: High-definition multimedia interface (HDMI) connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_LVDS:
+			wprintf(L"%sConnector Type: Low voltage differential signaling (LVDS) connector or MIPI Digital Serial Interface (DSI)\n", szIndent);
+			wprintf(L"%s                A connector using the LVDS or MIPI Digital Serial Interface (DSI) interface to connect internally to a display device. The connection between the graphics adapter and the display device is permanent, non-removable, and not accessible to the user. Applications should not enable High-Bandwidth Digital Content Protection (HDCP) for this connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_D_JPN:
+			wprintf(L"%sConnector Type: Japanese D connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_SDI:
+			wprintf(L"%sConnector Type: SDI (serial digital image) connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_DISPLAYPORT_EXTERNAL:
+			wprintf(L"%sConnector Type: A display port that connects externally to a display device\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_DISPLAYPORT_EMBEDDED:
+			wprintf(L"%sConnector Type: An embedded display port that connects internally to a display device. Also known as an integrated display port.\n", szIndent);
+			wprintf(L"%s                (*)Applications should not enable High-Bandwidth Digital Content Protection(HDCP) for embedded display ports\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_UDI_EXTERNAL:
+			wprintf(L"%sConnector Type: A Unified Display Interface (UDI) that connects externally to a display device\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_UDI_EMBEDDED:
+			wprintf(L"%sConnector Type: An embedded UDI that connects internally to a display device\n", szIndent);
+			wprintf(L"%s    (*) Also known as an integrated UDI\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_RESERVED:
+			wprintf(L"%sConnector Type: Reserved for future use\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_MIRACAST:
+			wprintf(L"%sConnector Type: A Miracast wireless connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_TRANSPORT_AGNOSTIC_DIGITAL_MODE_A:
+			wprintf(L"%sConnector Type: Transport Agnostic digital(Mode A) connector\n", szIndent);
+			break;
+		case OPM_CONNECTOR_TYPE_TRANSPORT_AGNOSTIC_DIGITAL_MODE_B:
+			wprintf(L"%sConnector Type: Transport Agnostic digital(Mode B) connector\n", szIndent);
+			break;
+		default:
+			wprintf(L"%sConnector Type: Unknown (0X%08X).\n", szIndent, ConnectorType);
+		}
+	}
+	else
+		wprintf(L"%sConnector Type: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	ULONG ulProtectionTypes = 0;
+	hr = OPMSession.GetSupportedProtectionTypes(ulProtectionTypes, &ulStatusFlag);
+
+	if (SUCCEEDED(hr))
+	{
+		WCHAR szProtectionTypeDesc[1024];
+		GetFlagsDesc(ulProtectionTypes,
+			OPM_PROTECTION_TYPE_flag_names, _countof(OPM_PROTECTION_TYPE_flag_names),
+			szProtectionTypeDesc, _countof(szProtectionTypeDesc),
+			L"OPM_PROTECTION_TYPE_NONE");
+		wprintf(L"%sSupported Protection Types: %s\n", szIndent, szProtectionTypeDesc);
+	}
+	else
+		wprintf(L"%sSupported Protection Types: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	OPM_ACP_AND_CGMSA_SIGNALING signal_info;
+	hr = OPMSession.GetACPAndCGMSASignaling(signal_info);
+	if (SUCCEEDED(hr))
+	{
+		WCHAR szTVProtectionStds[1024];
+		GetFlagsDescW(signal_info.ulAvailableTVProtectionStandards,
+			TV_PROTECTION_STD_flag_names, _countof(TV_PROTECTION_STD_flag_names),
+			szTVProtectionStds, _countof(szTVProtectionStds),
+			L"OPM_PROTECTION_STANDARD_NONE");
+		wprintf(L"%sACP and CGMSA Signaling: \n", szIndent);
+		wprintf(L"%s                       | AvailableTVProtectionStandards: %s\n", szIndent, szTVProtectionStds);
+		GetFlagsDescW(signal_info.ulActiveTVProtectionStandard,
+			TV_PROTECTION_STD_flag_names, _countof(TV_PROTECTION_STD_flag_names),
+			szTVProtectionStds, _countof(szTVProtectionStds),
+			L"OPM_PROTECTION_STANDARD_NONE");
+		wprintf(L"%s                       | ActiveTVProtectionStandard: %s\n", szIndent, szTVProtectionStds);
+		wprintf(L"%s                       | AspectRatioValidMask1: 0X%X\n", szIndent, signal_info.ulAspectRatioValidMask1);
+		wprintf(L"%s                       | AspectRatioData1: 0X%X\n", szIndent, signal_info.ulAspectRatioData1);
+		wprintf(L"%s                       | AspectRatioValidMask2: 0X%X\n", szIndent, signal_info.ulAspectRatioValidMask2);
+		wprintf(L"%s                       | AspectRatioData2: 0X%X\n", szIndent, signal_info.ulAspectRatioData2);
+		wprintf(L"%s                       | AspectRatioValidMask3: 0X%X\n", szIndent, signal_info.ulAspectRatioValidMask3);
+		wprintf(L"%s                       | AspectRatioData3: 0X%X\n", szIndent, signal_info.ulAspectRatioData3);
+	}
+	else
+		wprintf(L"%sACP and CGMSA Signaling: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	ULONG ulHDCPFlags = 0;
+	OPM_HDCP_KEY_SELECTION_VECTOR ksv;
+	hr = OPMSession.GetConnectedHDCPDeviceInformation(ulHDCPFlags, ksv);
+	if (SUCCEEDED(hr))
+	{
+		wprintf(L"%sConnected HDCP Device Information: \n", szIndent);
+		wprintf(L"%s                                 | HDCPFlags: %s \n", szIndent, 
+			ulHDCPFlags == OPM_HDCP_FLAG_NONE?L"OPM_HDCP_FLAG_NONE":
+			ulHDCPFlags == OPM_HDCP_FLAG_REPEATER?L"OPM_HDCP_FLAG_REPEATER":L"Unknown");
+		wprintf(L"%s                                 | KSV: %02X %02X %02X %02X %02X\n", szIndent, 
+			ksv.abKeySelectionVector[0], ksv.abKeySelectionVector[1], ksv.abKeySelectionVector[2],
+			ksv.abKeySelectionVector[3], ksv.abKeySelectionVector[4]);
+	}
+	else
+		wprintf(L"%sConnected HDCP Device Information: N/A {hr: 0X%X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	ULONG ulHDCPSRMVersion = 0;
+	hr = OPMSession.GetCurrentHDCPSRMVersion(ulHDCPSRMVersion, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sHDCP SRM Version: %d(0X%X)\n", szIndent, ulHDCPSRMVersion, ulHDCPSRMVersion);
+	else
+		wprintf(L"%sHDCP SRM Version: N/A {hr: 0X%X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	ULONG ulBusType = 0;
+	hr = OPMSession.GetAdaptorBusType(ulBusType, &ulStatusFlag);
+
+	if (SUCCEEDED(hr))
+	{
+		WCHAR szBusTypeDesc[1024];
+		GetFlagsDescW(ulBusType, OPM_BUS_TYPE_flag_names, _countof(OPM_BUS_TYPE_flag_names), szBusTypeDesc, _countof(szBusTypeDesc), L"OPM_BUS_TYPE_OTHER");
+
+		wprintf(L"%sAdaptor Bus Type: %s\n", szIndent, szBusTypeDesc);
+	}
+	else
+		wprintf(L"%sAdaptor Bus Type: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	UINT64 ullOutputID = 0;
+	hr = OPMSession.GetOutputID(ullOutputID, &ulStatusFlag);
+	
+	if (SUCCEEDED(hr))
+		wprintf(L"%sOutput ID: %llu (0X%llX)\n", szIndent, ullOutputID, ullOutputID);
+	else
+		wprintf(L"%sOutput ID: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	OPM_OUTPUT_HARDWARE_PROTECTION hardware_protection;
+	hr = OPMSession.GetOutputHardwareProtectionSupport(hardware_protection, &ulStatusFlag);
+
+	if (SUCCEEDED(hr))
+		wprintf(L"%sOutput Hardware Protection Support: %s\n", szIndent, hardware_protection == OPM_OUTPUT_HARDWARE_PROTECTION_SUPPORTED ? L"Yes" : L"No");
+	else
+		wprintf(L"%sOutput Hardware Protection Support: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	DWORD codecMerit = 0;
+	hr = OPMSession.GetCodecInfo(__uuidof(CMSH264DecoderMFT), codecMerit);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sMSH264 MFT Merit: %lu\n", szIndent, codecMerit);
+	else
+		wprintf(L"%sMSH264 MFT Merit: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	OPM_ACTUAL_OUTPUT_FORMAT output_format;
+	hr = OPMSession.GetActualOutputFormat(output_format);
+	if (SUCCEEDED(hr))
+	{
+		wprintf(L"%sActual Output Format: \n", szIndent);
+		wprintf(L"%s                    | DisplayWidth: %lu\n", szIndent, output_format.ulDisplayWidth);
+		wprintf(L"%s                    | DisplayHeight: %lu\n", szIndent, output_format.ulDisplayHeight);
+		wprintf(L"%s                    | Display interlace mode: %s\n", szIndent, SampleFormat_NameW(output_format.dsfSampleInterleaveFormat));
+		wprintf(L"%s                    | D3D Format: %s\n", szIndent, D3DFormat_NameW(output_format.d3dFormat));
+		wprintf(L"%s                    | Refresh Rate: %f\n", szIndent, output_format.ulFrequencyNumerator*1.0f/output_format.ulFrequencyDenominator);
+	}
+	else
+		wprintf(L"%sActual Output Format: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	ULONG ulDVICharacteristics = 0;
+	if ((ConnectorType&OPM_BUS_IMPLEMENTATION_MODIFIER_MASK) == OPM_CONNECTOR_TYPE_DVI)
+	{
+		hr = OPMSession.GetDVICharacteristics(ulDVICharacteristics, &ulStatusFlag);
+		if (SUCCEEDED(hr))
+			wprintf(L"%sDVI Characteristics: %s\n", szIndent,
+				ulDVICharacteristics == OPM_DVI_CHARACTERISTIC_1_0 ? L"OPM_DVI_CHARACTERISTIC_1_0" :
+				ulDVICharacteristics == OPM_DVI_CHARACTERISTIC_1_1_OR_ABOVE ? L"OPM_DVI_CHARACTERISTIC_1_1_OR_ABOVE" : L"Unknown");
+		else
+			wprintf(L"%sDVI Characteristics: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+	}
+
+	ULONG protection_level = 0;
+	hr = OPMSession.GetVirtualProtectionLevel(OPM_PROTECTION_TYPE_ACP, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sVirtual Protection Level for ACP: %s\n", szIndent, OPM_ACP_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sVirtual Protection Level for ACP: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	protection_level = 0;
+	hr = OPMSession.GetVirtualProtectionLevel(OPM_PROTECTION_TYPE_CGMSA, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sVirtual Protection Level for CGMS-A: %s\n", szIndent, OPM_CGMSA_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sVirtual Protection Level for CGMS-A: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	protection_level = 0;
+	hr = OPMSession.GetVirtualProtectionLevel(OPM_PROTECTION_TYPE_HDCP, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sVirtual Protection Level for HDCP: %s\n", szIndent, OPM_HDCP_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sVirtual Protection Level for HDCP: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	protection_level = 0;
+	hr = OPMSession.GetVirtualProtectionLevel(OPM_PROTECTION_TYPE_DPCP, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sVirtual Protection Level for DPCP: %s\n", szIndent, OPM_DPCP_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sVirtual Protection Level for DPCP: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	hr = OPMSession.GetActualProtectionLevel(OPM_PROTECTION_TYPE_ACP, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sActual Protection Level for ACP: %s\n", szIndent, OPM_ACP_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sActual Protection Level for ACP: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	protection_level = 0;
+	hr = OPMSession.GetActualProtectionLevel(OPM_PROTECTION_TYPE_CGMSA, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sActual Protection Level for CGMS-A: %s\n", szIndent, OPM_CGMSA_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sActual Protection Level for CGMS-A: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	protection_level = 0;
+	hr = OPMSession.GetActualProtectionLevel(OPM_PROTECTION_TYPE_HDCP, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sActual Protection Level for HDCP: %s\n", szIndent, OPM_HDCP_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sActual Protection Level for HDCP: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+
+	protection_level = 0;
+	hr = OPMSession.GetActualProtectionLevel(OPM_PROTECTION_TYPE_DPCP, protection_level, &ulStatusFlag);
+	if (SUCCEEDED(hr))
+		wprintf(L"%sActual Protection Level for DPCP: %s\n", szIndent, OPM_DPCP_LEVEL_NAMEW(protection_level));
+	else
+		wprintf(L"%sActual Protection Level for DPCP: N/A {hr: 0X%08X(%s)}\n", szIndent, hr, OPM_RESULT_NAME(hr));
+}
+
+void ShowMonitorOPMStatus(HMONITOR hMonitor, int nIndent=0)
+{
+	HRESULT hr = S_OK;
+	ULONG ulNumVideoOutputs;
+	IOPMVideoOutput **ppOPMVideoOutput = nullptr;
+	hr = OPMGetVideoOutputsFromHMONITOR(hMonitor, OPM_VOS_OPM_SEMANTICS, &ulNumVideoOutputs, &ppOPMVideoOutput);
+
+	if (FAILED(hr))
+	{
+		wprintf(L"Failed to get OPM video outputs {hr: 0X%X}.\n", hr);
+		return;
+	}
+
+	for (UINT i = 0; i < ulNumVideoOutputs; i++)
+	{
+		if (ppOPMVideoOutput[i] == nullptr)
+			continue;
+
+		WCHAR szFmtStr[256];
+		swprintf_s(szFmtStr, _countof(szFmtStr), L"%%%dsOPMVideoOutput#%%d:\n", nIndent);
+
+		wprintf(szFmtStr, L"", i);
+		ShowOPMVideoOutputStatus(ppOPMVideoOutput[i], nIndent + 4);
+	}
+}
+
+HRESULT EnableHDCP(HMONITOR hMonitor, int nIndent = 0)
+{
+	HRESULT hr = S_OK;
+	ULONG ulNumVideoOutputs;
+	IOPMVideoOutput **ppOPMVideoOutput = nullptr;
+	hr = OPMGetVideoOutputsFromHMONITOR(hMonitor, OPM_VOS_OPM_SEMANTICS, &ulNumVideoOutputs, &ppOPMVideoOutput);
+
+	WCHAR szIndent[1024];
+	memset(szIndent, 0, sizeof(szIndent));
+	for (size_t i = 0; i < nIndent; i++)
+		szIndent[i] = L' ';
+
+	if (FAILED(hr))
+	{
+		wprintf(L"Failed to get OPM video outputs {hr: 0X%X}.\n", hr);
+		return hr;
+	}
+
+	for (UINT i = 0; i < ulNumVideoOutputs; i++)
+	{
+		if (ppOPMVideoOutput[i] == nullptr)
+			continue;
+
+		ULONG ulStatusFlag = 0;
+		ULONG ulProtectionTypes = 0;
+		COPMSession OPMSession(ppOPMVideoOutput[i], &hr);
+
+		hr = OPMSession.GetSupportedProtectionTypes(ulProtectionTypes);
+
+		if (ulProtectionTypes&OPM_PROTECTION_TYPE_HDCP)
+		{
+			ULONG ulSetHDCPSRMVersion = 0;
+			hr = OPMSession.SetHDCPSRM(nullptr, 0, &ulSetHDCPSRMVersion);
+			if (SUCCEEDED(hr))
+			{
+				wprintf(L"%sSet HDCP SRM: Success.\n", szIndent);
+
+				hr = OPMSession.SetProtectionLevel(OPM_PROTECTION_TYPE_HDCP, OPM_HDCP_ON);
+				if (SUCCEEDED(hr))
+					wprintf(L"%sSet Protection Level(OPM_PROTECTION_TYPE_HDCP, OPM_HDCP_ON): Success.\n", szIndent);
+				else
+					wprintf(L"%sSet Protection Level(OPM_PROTECTION_TYPE_HDCP, OPM_HDCP_ON): Failed {hr: 0X%08X(%s)}.\n", szIndent, hr, OPM_RESULT_NAME(hr));
+			}
+			else
+				wprintf(L"%sSet HDCP SRM: Failed {hr: 0X%08X}.\n", szIndent, hr);
+		}
+
+		if (FAILED(hr))
+			break;
+	}
+
+	return hr;
+}
+
+void ListMonitorOPMStatus()
+{
+	HRESULT hr = S_OK;
+	// Generate the report for IDXGIAdaptor
+	ComPtr<IDXGIFactory> spFactory;
+	if (SUCCEEDED(CreateDXGIFactory(IID_IDXGIFactory, (void**)&spFactory)))
+	{
+		UINT idxAdaptor = 0;
+		ComPtr<IDXGIAdapter> spAdaptor;
+		while (SUCCEEDED(spFactory->EnumAdapters(idxAdaptor, &spAdaptor)))
+		{
+			UINT idxOutput = 0;
+			ComPtr<IDXGIOutput> spOutput;
+			while (SUCCEEDED(spAdaptor->EnumOutputs(idxOutput, &spOutput)))
+			{
+				DXGI_OUTPUT_DESC output_desc;
+				if (SUCCEEDED(spOutput->GetDesc(&output_desc)))
+				{
+					wprintf(L"\nOutput device name: %s\n", output_desc.DeviceName);
+					ShowMonitorOPMStatus(output_desc.Monitor, 4);
+
+					int nTries = 0;
+					do
+					{
+						if (SUCCEEDED(EnableHDCP(output_desc.Monitor, 4)))
+						{
+							ShowMonitorOPMStatus(output_desc.Monitor, 4);
+						}
+
+						nTries++;
+						::Sleep(100);
+
+					} while (nTries < 3);
+				}
+
+				idxOutput++;
+			}
+
+			idxAdaptor++;
+		}
+	}
+	else
+	{
+		_tprintf(_T("[D3DReport] Failed to create DXGI Factory.\n"));
+	}
+}
+
 void PrintUsage()
 {
 	printf("Usage:\n");
@@ -175,6 +576,9 @@ void PrintUsage()
 	printf("        help      show more detailed help message for each categories\n");
 	printf("        devices   show the display devices and their information\n");
 	printf("        report    show the collected D3D report\n");
+	printf("        opm       show the opm status of monitors\n");
+	printf("    Options:\n");
+	printf("        --verbose show more logs\n");
 }
 
 int _tmain(int argc, const TCHAR* argv[])
@@ -188,13 +592,26 @@ int _tmain(int argc, const TCHAR* argv[])
 		return 0;
 	}
 
+	if (argc >= 3)
+	{
+		for (int i = 2; i < argc; i++) {
+			if (_tcsncmp(argv[i], _T("--verbose"), 9) == 0)
+			{
+				g_verbose_level = 1;
+			}
+		}
+	}
+
 	if (_tcsicmp(argv[1], _T("devices")) == 0)
 	{
 		ListDisplayDevices();
 	}
+	else if (_tcsicmp(argv[1], _T("opm")) == 0)
+	{
+		ListMonitorOPMStatus();
+	}
 	else if (_tcsicmp(argv[1], _T("report")) == 0)
 	{
-
 		HRESULT hr = S_OK;
 		ComPtr<ID3D11Device> spD3D11Device;
 		D3D_FEATURE_LEVEL FeatureLevel;
